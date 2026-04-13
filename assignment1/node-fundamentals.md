@@ -25,5 +25,5 @@ Some key uses for Node are chat applications like WhatsApp or Discord, shopping 
 ```js
 //  ESM can also let you import and export but it was built for the brwoser. It uses the following method for importing and exporting 
 // import {useState} from 'react'
-// export {add, multiply}s
+// export {add, multiply}
 ``` 
