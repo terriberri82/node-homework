@@ -45,7 +45,7 @@ next();
 })
 
 //static files
-app.use('/images', express.static('week-3-middleware/public/images'));
+app.use('/images', express.static(path.join(__dirname, '../public/images')));
 
 //Routes (your route handlers)
 app.use('/', dogsRouter); // Do not remove this line
