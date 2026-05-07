@@ -2,6 +2,8 @@ const express = require("express");
 const errorHandler = require("./middleware/error-handler");
 const notFoundHandler = require("./middleware/not-found")
 const userRouter = require("./routes/userRoutes");
+const authMiddleware = require("./middleware/auth");
+const taskRouter = require("./routes/taskRoutes"); 
 const app = express();
 
 global.user_id = null;
@@ -23,6 +25,7 @@ app.post('/testpost', (req,res) =>{
   res.json({message:"This response is completed"})
 });
 
+app.use("/api/tasks", authMiddleware, taskRouter);
 app.use('/api/users', userRouter);
 
 app.use(notFoundHandler);
