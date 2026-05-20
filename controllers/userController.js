@@ -3,6 +3,7 @@ const { userSchema } = require("../validation/userSchema");
 const crypto = require("crypto");
 const util = require("util");
 const scrypt = util.promisify(crypto.scrypt);
+const pool = require("../db/pg-pool");
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -17,41 +18,49 @@ async function comparePassword(inputPassword, storedHash) {
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
 
-async function register(req, res) {
+async function register(req, res, next) {
   if (!req.body) req.body = {};
   const {error, value} = userSchema.validate(req.body, {abortEarly: false});
+  
   if (error){
-    return res.status(StatusCodes.BAD_REQUEST).json({message:error.message})
+    return res.status(400).json({
+      message: "Validation failed",
+      details: error.details,
+    });
   }
+   let user = null;
+  value.hashed_password = await hashPassword(value.password);
+   try {
+    user = await pool.query(`INSERT INTO users (email, name, hashed_password) 
+      VALUES ($1, $2, $3) RETURNING id, email, name`,
+      [value.email, value.name, value.hashed_password]
+    ); // note that you use a parameterized query
+  } catch (e) {
+  // the email might already be registered
+  if (e.code === "23505") { return res.status(400).json({
+    message: "Email is already registered"
+  })
+  }
+  return next(e); // all other errors get passed to the error handler
+}
 
-  const hashedPassword = await hashPassword(value.password);
-  const newUser = { name: value.name, email: value.email, hashedPassword };
-  global.users.push(newUser);
-  global.user_id = newUser; // After the registration step, the user is set to logged on.
-  res.status(StatusCodes.CREATED).json({ name: newUser.name, email: newUser.email });
+  global.user_id = user.rows[0].id; // After the registration step, the user is set to logged on.
+  res.status(StatusCodes.CREATED).json({ name: user.rows[0].name, email: user.rows[0].email });
 }
 
 async function logon(req, res) {
-  const foundUser = global.users.find((user) => user.email === req.body.email);
-
-  if (foundUser) {
-    const passwordMatch = await comparePassword(req.body.password, foundUser.hashedPassword);
-      if (passwordMatch){
-      global.user_id = foundUser;
-      return res
-        .status(StatusCodes.OK)
-        .json({ name: foundUser.name, email: foundUser.email });
-    } else {
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({
-          message: "The email and password you entered is unauthorized",
-        });
-    }
-  }
-  return res
-    .status(StatusCodes.NOT_FOUND)
-    .json({ message: "This account is not found" });
+  
+  const { email, password } = req.body;
+  const result = await pool.query("SELECT * FROM users WHERE email = $1", [email.toLowerCase()]);
+  if (result.rows.length === 0) {
+  return res.status(StatusCodes.NOT_FOUND).json({ message: "This account is not found" });
+}
+  const passwordMatch = await comparePassword(password, result.rows[0].hashed_password);
+  if (!passwordMatch) {
+  return res.status(StatusCodes.UNAUTHORIZED).json({ message: "The email and password you entered is unauthorized" });
+}
+global.user_id = result.rows[0].id;
+return res.status(StatusCodes.OK).json({ name: result.rows[0].name, email: result.rows[0].email });
 }
 function logoff(req, res) {
   global.user_id = null;
