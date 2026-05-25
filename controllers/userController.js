@@ -3,7 +3,7 @@ const { userSchema } = require("../validation/userSchema");
 const crypto = require("crypto");
 const util = require("util");
 const scrypt = util.promisify(crypto.scrypt);
-const pool = require("../db/pg-pool");
+const prisma = require("../db/prisma")
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -28,39 +28,42 @@ async function register(req, res, next) {
       details: error.details,
     });
   }
-   let user = null;
-  value.hashed_password = await hashPassword(value.password);
+   let user = null; 
+  value.hashedPassword = await hashPassword(value.password);
+  delete value.password;
    try {
-    user = await pool.query(`INSERT INTO users (email, name, hashed_password) 
-      VALUES ($1, $2, $3) RETURNING id, email, name`,
-      [value.email, value.name, value.hashed_password]
-    ); // note that you use a parameterized query
-  } catch (e) {
+     user = await prisma.user.create({
+    data: { name: value.name, email: value.email, hashedPassword: value.hashedPassword },
+    select: { name: true, email: true, id: true} // specify the column values to return
+  });
+  } catch (err) {
   // the email might already be registered
-  if (e.code === "23505") { return res.status(400).json({
+  if (err.name === "PrismaClientKnownRequestError" && err.code === "P2002") { return res.status(400).json({
     message: "Email is already registered"
   })
-  }
-  return next(e); // all other errors get passed to the error handler
+  }else {
+      return next(err); 
+    }
 }
 
-  global.user_id = user.rows[0].id; // After the registration step, the user is set to logged on.
-  res.status(StatusCodes.CREATED).json({ name: user.rows[0].name, email: user.rows[0].email });
+  global.user_id = user.id; // After the registration step, the user is set to logged on.
+  res.status(StatusCodes.CREATED).json({ name: user.name, email: user.email });
 }
 
 async function logon(req, res) {
   
-  const { email, password } = req.body;
-  const result = await pool.query("SELECT * FROM users WHERE email = $1", [email.toLowerCase()]);
-  if (result.rows.length === 0) {
+  let { email, password } = req.body;
+  email = email.toLowerCase() 
+const user = await prisma.user.findUnique({ where: { email }});
+  if (user === null) {
   return res.status(StatusCodes.NOT_FOUND).json({ message: "This account is not found" });
 }
-  const passwordMatch = await comparePassword(password, result.rows[0].hashed_password);
+  const passwordMatch = await comparePassword(password, user.hashedPassword);
   if (!passwordMatch) {
   return res.status(StatusCodes.UNAUTHORIZED).json({ message: "The email and password you entered is unauthorized" });
 }
-global.user_id = result.rows[0].id;
-return res.status(StatusCodes.OK).json({ name: result.rows[0].name, email: result.rows[0].email });
+global.user_id = user.id;
+return res.status(StatusCodes.OK).json({ name: user.name, email: user.email });
 }
 function logoff(req, res) {
   global.user_id = null;
