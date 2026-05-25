@@ -1,18 +1,42 @@
 const { StatusCodes } = require("http-status-codes");
+const { userSchema } = require("../validation/userSchema");
+const crypto = require("crypto");
+const util = require("util");
+const scrypt = util.promisify(crypto.scrypt);
 
-function register(req, res) {
-  const newUser = { ...req.body }; // this makes a copy
-  global.users.push(newUser);
-  global.user_id = newUser; // After the registration step, the user is set to logged on.
-  delete req.body.password;
-  res.status(StatusCodes.CREATED).json(req.body);
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derivedKey = await scrypt(password, salt, 64);
+  return `${salt}:${derivedKey.toString("hex")}`;
 }
 
-function logon(req, res) {
+async function comparePassword(inputPassword, storedHash) {
+  const [salt, key] = storedHash.split(":");
+  const keyBuffer = Buffer.from(key, "hex");
+  const derivedKey = await scrypt(inputPassword, salt, 64);
+  return crypto.timingSafeEqual(keyBuffer, derivedKey);
+}
+
+async function register(req, res) {
+  if (!req.body) req.body = {};
+  const {error, value} = userSchema.validate(req.body, {abortEarly: false});
+  if (error){
+    return res.status(StatusCodes.BAD_REQUEST).json({message:error.message})
+  }
+
+  const hashedPassword = await hashPassword(value.password);
+  const newUser = { name: value.name, email: value.email, hashedPassword };
+  global.users.push(newUser);
+  global.user_id = newUser; // After the registration step, the user is set to logged on.
+  res.status(StatusCodes.CREATED).json({ name: newUser.name, email: newUser.email });
+}
+
+async function logon(req, res) {
   const foundUser = global.users.find((user) => user.email === req.body.email);
 
   if (foundUser) {
-    if (foundUser.password === req.body.password) {
+    const passwordMatch = await comparePassword(req.body.password, foundUser.hashedPassword);
+      if (passwordMatch){
       global.user_id = foundUser;
       return res
         .status(StatusCodes.OK)
