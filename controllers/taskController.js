@@ -11,7 +11,7 @@ async function create(req, res) {
     return res.status(StatusCodes.BAD_REQUEST).json({message:error.message})
   }  
  const task = await prisma.task.create({
-    data: { title: value.title, isCompleted: value.isCompleted, priority: value.priority, userId: global.user_id },
+    data: { title: value.title, isCompleted: value.isCompleted, priority: value.priority, userId: req.user.id },
     select: { title: true, isCompleted: true, id: true, priority: true, createdAt: true } 
   });
   res.status(StatusCodes.CREATED).json(task);
@@ -29,7 +29,7 @@ const page = value.page || 1;
 const limit = value.limit || 10;
 const skip = (page - 1) * limit;
 
-const whereClause = { userId: global.user_id };
+const whereClause = { userId: req.user.id };
 if (req.query.find) {
   whereClause.title = {
     contains: req.query.find,        // Matches %find% pattern
@@ -69,7 +69,7 @@ async function show(req, res, next) {
   const id = parseInt(req.params.id);
 try {
   const showTask = await prisma.task.findUnique({
-    where: { userId: global.user_id, id:id },
+    where: { userId: req.user.id, id:id },
     select: { title: true, isCompleted: true, id: true, priority: true, createdAt: true, User: {
       select: {
         name: true,
@@ -101,7 +101,7 @@ try {
     data: value,
     where: {
       id,
-      userId: global.user_id,
+      userId: req.user.id,
     },
     select: { title: true, isCompleted: true, id: true, priority: true, createdAt: true  }
   });
@@ -121,7 +121,7 @@ try {
    const deletedTask = await prisma.task.delete({
     where: {
       id,
-      userId: global.user_id,
+      userId: req.user.id,
     },
     select: { title: true, isCompleted: true, id: true, priority: true, createdAt: true  }
   });
@@ -159,7 +159,7 @@ const { tasks } = req.body;
       title: value.title,
       isCompleted: value.isCompleted || false,
       priority: value.priority || 'medium',
-      userId: global.user_id
+      userId: req.user.id
     });
   }
 
