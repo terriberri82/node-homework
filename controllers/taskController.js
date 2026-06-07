@@ -49,6 +49,9 @@ const tasks = await prisma.task.findMany({
   take: limit,
   orderBy: { createdAt: 'desc' } 
 });
+if(tasks.length === 0){
+  return res.status(StatusCodes.NOT_FOUND).json({message:"No tasks found"})
+};
   // Get total count for pagination metadata
 const totalTasks = await prisma.task.count({
   where: whereClause
@@ -77,6 +80,9 @@ try {
       }
     }} 
   });
+  if (!showTask) {
+  return res.status(StatusCodes.NOT_FOUND).json({ message: "The task was not found." });
+}
   return res.status(StatusCodes.OK).json(showTask);
 } catch (err) {
   if (err.code === "P2025" ) {
