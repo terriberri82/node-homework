@@ -57,5 +57,3 @@ describe("register a user ", () => {
   });
 })
 
-
-module.exports = { app, server }; 
