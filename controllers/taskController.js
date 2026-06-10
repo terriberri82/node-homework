@@ -30,9 +30,9 @@ const limit = value.limit || 10;
 const skip = (page - 1) * limit;
 
 const whereClause = { userId: req.user.id };
-if (req.query.find) {
+if (value.find) {
   whereClause.title = {
-    contains: req.query.find,        // Matches %find% pattern
+    contains: value.find,        // Matches %find% pattern
     mode: 'insensitive'              // Case-insensitive search (ILIKE in PostgreSQL)
   };
 }
@@ -47,7 +47,7 @@ const tasks = await prisma.task.findMany({
     }},
    skip: skip,
   take: limit,
-  orderBy: { createdAt: 'desc' } 
+  orderBy: { [value.sortBy]: value.sortDirection }
 });
 if(tasks.length === 0){
   return res.status(StatusCodes.NOT_FOUND).json({message:"No tasks found"})
