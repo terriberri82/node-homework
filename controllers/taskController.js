@@ -1,5 +1,5 @@
 const { StatusCodes } = require("http-status-codes");
-const { taskSchema, patchTaskSchema } = require("../validation/taskSchema");
+const { taskSchema, patchTaskSchema, bulkUpdateSchema, bulkDeleteSchema } = require("../validation/taskSchema");
 const paginationSchema = require("../validation/paginationSchema");
 const prisma = require("../db/prisma")
  
@@ -185,7 +185,48 @@ const { tasks } = req.body;
     return next(err);
   }
 }
+async function bulkUpdate (req, res, next){
+   if (!req.body) req.body = {};
+   const {error, value} = bulkUpdateSchema.validate(req.body, {abortEarly: false});
+  if (error){
+    return res.status(StatusCodes.BAD_REQUEST).json({message:error.message})
+  }  
+
+try {
+  const {ids, ...data} = value;
+  const task = await prisma.task.updateMany({
+     data: data,
+    where: {
+  id: { in: ids },
+  userId: req.user.id,
+},
+  });
+  return res.status(StatusCodes.OK).json(task);
+} catch (err) {
+  return next(err);
+}
+}
+
+async function bulkDelete (req, res, next){
+ if (!req.body) req.body = {};
+   const {error, value} = bulkDeleteSchema.validate(req.body, {abortEarly: false});
+  if (error){
+    return res.status(StatusCodes.BAD_REQUEST).json({message:error.message})
+  }  
+
+try {
+  const {ids} = value;
+  const task = await prisma.task.deleteMany({
+  where: {
+  id: { in: ids },
+  userId: req.user.id,
+},
+  });
+  return res.status(StatusCodes.OK).json(task);
+} catch (err) {
+  return next(err);
+}
+}
 
 
-
-module.exports = { create, index, show, update, deleteTask, bulkCreate };
+module.exports = { create, index, show, update, deleteTask, bulkCreate, bulkUpdate, bulkDelete };
