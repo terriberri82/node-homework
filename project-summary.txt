@@ -1,1 +1,16 @@
+Deployed Backend URL:
 https://my-task-tracker.onrender.com
+
+Extra Features Added:
+
+1. Bulk Update Tasks
+   - Path: /api/tasks/bulk
+   - Method: PATCH
+   - Body: { "ids": [1, 2, 3], "isCompleted": true }
+   - Bulk Update Tasks allows you to update multiple tasks at once. You must be logged in as the user for authorization. It will return the number of tasks affected. Only tasks belonging to the authenticated user will be updated. Tasks with IDs belonging to other users will be ignored.
+
+2. Bulk Delete Tasks
+   - Path: /api/tasks/bulk
+   - Method: DELETE
+   - Body: { "ids": [1, 2, 3] }
+   - Bulk Delete allows you to delete multiple tasks by their IDs. You must be logged in as the user for authorization. It will return the number of tasks affected. Only tasks belonging to the authenticated user will be deleted. Tasks with IDs belonging to other users will be ignored.
